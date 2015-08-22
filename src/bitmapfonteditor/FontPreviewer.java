@@ -18,6 +18,8 @@ public class FontPreviewer extends javax.swing.JPanel implements AdjustmentListe
     Color clrAscent = Color.RED;
     Color clrDescent = Color.BLUE;
     
+    FontMetrics fontMetrics;
+    
     int codepointUpperLeft = 0;
     
 
@@ -26,6 +28,8 @@ public class FontPreviewer extends javax.swing.JPanel implements AdjustmentListe
 
     private int headerHeight = 15;
     private int footerHeight = 5;
+    
+    private int headerWidth = 10;
 
     private int leftMarginWidth = 3;
     private int rightMarginWidth = 3;
@@ -44,7 +48,8 @@ public class FontPreviewer extends javax.swing.JPanel implements AdjustmentListe
     }
     
     public int getBoxWidth() {
-        return getGlyphWidth() + getLeftMarginWidth() + getRightMarginWidth();
+        int boxWidth = getGlyphWidth() + getLeftMarginWidth() + getRightMarginWidth();
+        return boxWidth > headerWidth ? boxWidth : headerWidth;
     }
     
     @Override
@@ -74,6 +79,13 @@ public class FontPreviewer extends javax.swing.JPanel implements AdjustmentListe
         
         int maxWidth = maxColumnsVisible * getBoxWidth();
         int maxHeight = maxRowsVisible * getBoxHeight();
+        
+        
+        fontMetrics = g.getFontMetrics();
+        
+        setHeaderWidth(2 + fontMetrics.charWidth(0x01f1));
+        setHeaderHeight(fontMetrics.getHeight() + 2);
+
 
         // gray dividers inside a box
         g.setColor(clrBoxLines);
@@ -96,15 +108,14 @@ public class FontPreviewer extends javax.swing.JPanel implements AdjustmentListe
             for (int j = 0; j < maxRowsVisible; j++)
                 drawBox(g, i, j);
 
-        //Font fnt = g.getFont();
     }
     
     private void drawBox(Graphics2D g, int i, int j) {
         char codepoint = (char)(codepointUpperLeft + i + j * getMaxColumnsVisible());
         g.drawString(
             Character.toString(codepoint), 
-            i * getBoxWidth() + getBoxWidth() / 2f, 
-            j * getBoxHeight() + getHeaderHeight()
+            i * getBoxWidth() + (getBoxWidth() - fontMetrics.charWidth(codepoint)) / 2f, 
+            j * getBoxHeight() + getHeaderHeight() - fontMetrics.getDescent()
         );
     }
     /**
@@ -196,5 +207,13 @@ public class FontPreviewer extends javax.swing.JPanel implements AdjustmentListe
 
     public void setMaxRowsVisible(int maxRowsVisible) {
         this.maxRowsVisible = maxRowsVisible;
+    }
+
+    public int getHeaderWidth() {
+        return headerWidth;
+    }
+
+    public void setHeaderWidth(int headerWidth) {
+        this.headerWidth = headerWidth;
     }
 }
