@@ -10,7 +10,13 @@ public class BitmapFontEditor {
      * @param args the command line arguments
      */
     public static void main(String[] args) {
-        // TODO code application logic here
+        javax.swing.SwingUtilities.invokeLater(new Runnable() {
+            @Override
+            public void run() {
+                FrameMain frameMain = new FrameMain();
+                frameMain.setVisible(true);
+            }
+        });
     }
     
 }
