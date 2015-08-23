@@ -2,13 +2,17 @@ package bitmapfonteditor;
 
 import java.awt.*;
 import java.awt.event.*;
+import java.io.*;
 import javax.swing.event.*;
+import org.jnode.awt.font.bdf.*;
+import org.jnode.font.bdf.*;
 
 /**
  *
  * @author l4l
  */
 public class FontPreviewer extends javax.swing.JPanel implements AdjustmentListener, ChangeListener, ItemListener {
+    private static final org.apache.log4j.Logger log = org.apache.log4j.Logger.getLogger(FontPreviewer.class);
 
     Color clrBackground = Color.WHITE;
     Color clrForeground = Color.BLACK;
@@ -17,22 +21,22 @@ public class FontPreviewer extends javax.swing.JPanel implements AdjustmentListe
     Color clrBoxLines = Color.GRAY;
     Color clrAscent = Color.RED;
     Color clrDescent = Color.BLUE;
+    Color clrBBox = Color.PINK;
+    
+    BDFFontContainer fontContainer = null;
+    BDFFont font = null;
     
     FontMetrics fontMetrics;
     
     int codepointUpperLeft = 0;
     
-
-    private int glyphHeight = 16;
+    private int glyphHeight = 16; // pure glyph size without any decorations inside
     private int glyphWidth = 8;
 
-    private int headerHeight = 15;
-    private int footerHeight = 5;
+    private int headerHeight = 15; // header size with decorations inside
+    private int footerHeight = 5; // footer size with decorations inside
     
-    private int headerWidth = 10;
-
-    private int leftMarginWidth = 3;
-    private int rightMarginWidth = 3;
+    private int headerWidth = 10; // header size with decorations inside
 
     private int maxColumnsVisible = 1;
     private int maxRowsVisible = 1;
@@ -42,15 +46,16 @@ public class FontPreviewer extends javax.swing.JPanel implements AdjustmentListe
         initFont();
     }
 
-        
+    /** it's size of each "glyph box", including bounding lines on top and left */
     public int getBoxHeight() {
         return getGlyphHeight() + getFooterHeight() + getHeaderHeight();
     }
     
+    /** it's size of each "glyph box", including bounding lines on top and left */
     public int getBoxWidth() {
-        int boxWidth = getGlyphWidth() + getLeftMarginWidth() + getRightMarginWidth();
+        int boxWidth = getGlyphWidth() + 1;
         return boxWidth > headerWidth ? boxWidth : headerWidth;
-    }
+    }    
     
     @Override
     public void adjustmentValueChanged(AdjustmentEvent e) {
@@ -83,13 +88,13 @@ public class FontPreviewer extends javax.swing.JPanel implements AdjustmentListe
         
         fontMetrics = g.getFontMetrics();
         
-        setHeaderWidth(2 + fontMetrics.charWidth(0x01f1));
+        setHeaderWidth(4 + fontMetrics.charWidth(0x01f1));
         setHeaderHeight(fontMetrics.getHeight() + 2);
 
 
         // gray dividers inside a box
         g.setColor(clrBoxLines);
-        for (int j = 0; j <= maxRowsVisible; j++) {
+        for (int j = 0; j < maxRowsVisible; j++) {
             int yHeader = j * getBoxHeight() + getHeaderHeight();
             g.drawLine(0, yHeader, maxWidth, yHeader);
         }
@@ -111,12 +116,49 @@ public class FontPreviewer extends javax.swing.JPanel implements AdjustmentListe
     }
     
     private void drawBox(Graphics2D g, int i, int j) {
+        int iLeft = i * getBoxWidth() + 1; // coord after left line of the box
+        int iTop = j * getBoxHeight() + 1; // coord after top line of the box
+        
+        g.setColor(clrText);
         char codepoint = (char)(codepointUpperLeft + i + j * getMaxColumnsVisible());
         g.drawString(
             Character.toString(codepoint), 
-            i * getBoxWidth() + (getBoxWidth() - fontMetrics.charWidth(codepoint)) / 2f, 
-            j * getBoxHeight() + getHeaderHeight() - fontMetrics.getDescent()
+            iLeft + (getBoxWidth() - 1 - fontMetrics.charWidth(codepoint)) / 2f, 
+            iTop + getHeaderHeight()  - fontMetrics.getDescent()
         );
+        if (font.canDisplay(codepoint)) {
+            BDFGlyph glyph = fontContainer.getGlyph(codepoint);
+            log.error("" + 
+                glyph.getData().length + " : " + 
+                glyph.getName() + " = " + 
+                glyph.getBbx().width + "x" + glyph.getBbx().height);
+            
+            g.setColor(clrBBox);
+            g.drawRect(
+                iLeft, 
+                iTop + getHeaderHeight(),
+                getGlyphWidth(),  //glyph.getBbx().width, 
+                getGlyphHeight() //glyph.getBbx().height
+            );
+
+            g.setColor(clrForeground);
+            for (int x = 0; x < glyph.getBbx().width; x++) {
+                for (int y = 0; y < glyph.getBbx().height; y++)
+                    if (1 == glyph.data[x + y * glyph.getBbx().width]) {
+                        System.out.print("X");
+                        /*
+                        g.drawRect(
+                            i * getBoxWidth() + x, 
+                            j * getBoxHeight() + getHeaderHeight() + y, 
+                            i * getBoxWidth() + x + 1, 
+                            j * getBoxHeight() + getHeaderHeight() + y - 1
+                        ); */
+                    } else
+                        System.out.print("_");
+                System.out.println();
+            }
+
+        }
     }
     /**
      * This method is called from within the constructor to initialize the form. WARNING: Do NOT modify this code. The content of this method is always regenerated by the Form Editor.
@@ -142,7 +184,13 @@ public class FontPreviewer extends javax.swing.JPanel implements AdjustmentListe
     // End of variables declaration//GEN-END:variables
 
     private void initFont() {
-        
+        try {
+            BDFParser parser = new BDFParser(new FileInputStream("/home/l4l/FixedsysMono-16.bdf"));
+            fontContainer = parser.loadFont();
+            font = new BDFFont(fontContainer);
+        } catch (FileNotFoundException | ParseException ex) {
+            log.error(ex);
+        }
     }
 
     public int getFooterHeight() {
@@ -175,22 +223,6 @@ public class FontPreviewer extends javax.swing.JPanel implements AdjustmentListe
 
     public void setHeaderHeight(int headerHeight) {
         this.headerHeight = headerHeight;
-    }
-
-    public int getLeftMarginWidth() {
-        return leftMarginWidth;
-    }
-
-    public void setLeftMarginWidth(int leftMarginWidth) {
-        this.leftMarginWidth = leftMarginWidth;
-    }
-
-    public int getRightMarginWidth() {
-        return rightMarginWidth;
-    }
-
-    public void setRightMarginWidth(int rightMarginWidth) {
-        this.rightMarginWidth = rightMarginWidth;
     }
 
     public int getMaxColumnsVisible() {
