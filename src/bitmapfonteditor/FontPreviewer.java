@@ -12,6 +12,7 @@ import org.jnode.font.bdf.*;
  * @author l4l
  */
 public class FontPreviewer extends javax.swing.JPanel implements AdjustmentListener, ChangeListener, ItemListener {
+
     private static final org.apache.log4j.Logger log = org.apache.log4j.Logger.getLogger(FontPreviewer.class);
 
     Color clrBackground = Color.WHITE;
@@ -22,20 +23,20 @@ public class FontPreviewer extends javax.swing.JPanel implements AdjustmentListe
     Color clrAscent = Color.RED;
     Color clrDescent = Color.BLUE;
     Color clrBBox = Color.PINK;
-    
+
     BDFFontContainer fontContainer = null;
     BDFFont font = null;
-    
+
     FontMetrics fontMetrics;
-    
+
     int codepointUpperLeft = 0;
-    
+
     private int glyphHeight = 16; // pure glyph size without any decorations inside
     private int glyphWidth = 8;
 
     private int headerHeight = 15; // header size with decorations inside
     private int footerHeight = 5; // footer size with decorations inside
-    
+
     private int headerWidth = 10; // header size with decorations inside
 
     private int maxColumnsVisible = 1;
@@ -46,56 +47,61 @@ public class FontPreviewer extends javax.swing.JPanel implements AdjustmentListe
         initFont();
     }
 
-    /** it's size of each "glyph box", including bounding lines on top and left */
+    /**
+     * it's size of each "glyph box", including bounding lines on top and left
+     */
     public int getBoxHeight() {
         return getGlyphHeight() + getFooterHeight() + getHeaderHeight();
     }
-    
-    /** it's size of each "glyph box", including bounding lines on top and left */
+
+    /**
+     * it's size of each "glyph box", including bounding lines on top and left
+     */
     public int getBoxWidth() {
         int boxWidth = getGlyphWidth() + 1;
         return boxWidth > headerWidth ? boxWidth : headerWidth;
-    }    
-    
+    }
+
     @Override
     public void adjustmentValueChanged(AdjustmentEvent e) {
         repaint();
     }
-    
+
     @Override
     public void stateChanged(ChangeEvent e) {
         repaint();
     }
-    
+
     @Override
     public void itemStateChanged(ItemEvent e) {
         repaint();
     }
-    
+
     @Override
     protected void paintComponent(Graphics g1) {
         Graphics2D g = (Graphics2D) g1;
-        
+
         g.setColor(clrBackground);
         g.fillRect(0, 0, getWidth(), getHeight());
-        
+
         setMaxColumnsVisible((int) Math.floor((double) getWidth() / getBoxWidth()));
         setMaxRowsVisible((int) Math.floor((double) getHeight() / getBoxHeight()));
-        
+
         int maxWidth = maxColumnsVisible * getBoxWidth();
         int maxHeight = maxRowsVisible * getBoxHeight();
-        
-        
-        fontMetrics = g.getFontMetrics();
-        
-        setHeaderWidth(4 + fontMetrics.charWidth(0x01f1));
-        setHeaderHeight(fontMetrics.getHeight() + 2);
 
+        fontMetrics = g.getFontMetrics();
+
+        setHeaderWidth(4 + fontMetrics.stringWidth("M."));
+        setHeaderHeight(fontMetrics.getHeight() + 3);
+        setFooterHeight(getHeaderHeight());
 
         // gray dividers inside a box
         g.setColor(clrBoxLines);
         for (int j = 0; j < maxRowsVisible; j++) {
             int yHeader = j * getBoxHeight() + getHeaderHeight();
+            g.drawLine(0, yHeader, maxWidth, yHeader);
+            yHeader = j * getBoxHeight() + getHeaderHeight();
             g.drawLine(0, yHeader, maxWidth, yHeader);
         }
 
@@ -108,58 +114,77 @@ public class FontPreviewer extends javax.swing.JPanel implements AdjustmentListe
         // horisontal lines
         for (int j = 0; j <= maxRowsVisible; j++)
             g.drawLine(0, j * getBoxHeight(), maxWidth, j * getBoxHeight());
-        
+
         for (int i = 0; i < maxColumnsVisible; i++)
             for (int j = 0; j < maxRowsVisible; j++)
                 drawBox(g, i, j);
 
     }
-    
+
     private void drawBox(Graphics2D g, int i, int j) {
         int iLeft = i * getBoxWidth() + 1; // coord after left line of the box
         int iTop = j * getBoxHeight() + 1; // coord after top line of the box
-        
+
         g.setColor(clrText);
-        char codepoint = (char)(codepointUpperLeft + i + j * getMaxColumnsVisible());
+        char codepoint = (char) (codepointUpperLeft + i + j * getMaxColumnsVisible());
         g.drawString(
-            Character.toString(codepoint), 
-            iLeft + (getBoxWidth() - 1 - fontMetrics.charWidth(codepoint)) / 2f, 
-            iTop + getHeaderHeight()  - fontMetrics.getDescent()
+            Character.toString(codepoint),
+            iLeft + (getBoxWidth() - 1 - fontMetrics.charWidth(codepoint)) / 2f,
+            iTop + getHeaderHeight() - fontMetrics.getDescent()
         );
         if (font.canDisplay(codepoint)) {
             BDFGlyph glyph = fontContainer.getGlyph(codepoint);
-            log.error("" + 
-                glyph.getData().length + " : " + 
-                glyph.getName() + " = " + 
-                glyph.getBbx().width + "x" + glyph.getBbx().height);
-            
+
+            /*g.drawString(
+             glyph.getName(), 
+             iLeft + (getBoxWidth() - 1 - fontMetrics.stringWidth(glyph.getName())) / 2f, 
+             iTop + getBoxHeight() - 1 - fontMetrics.getDescent()
+             );*/
+            //log.error(glyph.getData().length+":"+glyph.getName()+"="+glyph.getBbx().width+"x"+glyph.getBbx().height);
             g.setColor(clrBBox);
             g.drawRect(
-                iLeft, 
+                iLeft,
                 iTop + getHeaderHeight(),
-                getGlyphWidth(),  //glyph.getBbx().width, 
+                getGlyphWidth(), //glyph.getBbx().width, 
                 getGlyphHeight() //glyph.getBbx().height
             );
 
             g.setColor(clrForeground);
-            for (int x = 0; x < glyph.getBbx().width; x++) {
-                for (int y = 0; y < glyph.getBbx().height; y++)
-                    if (1 == glyph.data[x + y * glyph.getBbx().width]) {
-                        System.out.print("X");
-                        /*
-                        g.drawRect(
-                            i * getBoxWidth() + x, 
-                            j * getBoxHeight() + getHeaderHeight() + y, 
-                            i * getBoxWidth() + x + 1, 
-                            j * getBoxHeight() + getHeaderHeight() + y - 1
-                        ); */
-                    } else
-                        System.out.print("_");
-                System.out.println();
+            int glyphStartY = iTop + getHeaderHeight();
+            int w = 7, x = 0, y = 0;
+            for (int k = 0; k < glyph.getData().length; k++) {
+                if (1 == glyph.data[k])
+                    g.drawLine(
+                        iLeft + x,
+                        glyphStartY + y,
+                        iLeft + x,
+                        glyphStartY + y
+                    );
+
+                x++;
+                if (x > w) {
+                    x = 0;
+                    y++;
+                }
             }
+            /*
+             for (int x = 0; x < glyph.getDWidth().width; x++) {
+             for (int y = 0; y < glyph.getBbx().height; y++) {
+             if (1 == glyph.data[x + y * glyph.getBbx().width]) {
+             System.out.print("Ж");
+             g.drawRect(
+             iLeft + x, 
+             iTop + getHeaderHeight() + y, 
+             1, 1
+             );
+             } else System.out.print(" ");
+             }
+             System.out.println();
+             } */
 
         }
     }
+
     /**
      * This method is called from within the constructor to initialize the form. WARNING: Do NOT modify this code. The content of this method is always regenerated by the Form Editor.
      */
@@ -182,10 +207,9 @@ public class FontPreviewer extends javax.swing.JPanel implements AdjustmentListe
 
     // Variables declaration - do not modify//GEN-BEGIN:variables
     // End of variables declaration//GEN-END:variables
-
     private void initFont() {
         try {
-            BDFParser parser = new BDFParser(new FileInputStream("/home/l4l/FixedsysMono-16.bdf"));
+            BDFParser parser = new BDFParser(new FileInputStream("/home/l4l/.fonts/keyrus.bdf"));
             fontContainer = parser.loadFont();
             font = new BDFFont(fontContainer);
         } catch (FileNotFoundException | ParseException ex) {
